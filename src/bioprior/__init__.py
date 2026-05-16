@@ -12,6 +12,13 @@ from .prior_types import (
 )
 from .scoring import compute_bioprior_score
 from .segment_proposal import propose_bioprior_segments
+from .certified_frontier import (
+    CertifiedFrontierPlanner,
+    RiskCalibrator,
+    SelectionProfile,
+    candidates_from_rows,
+    conformal_quantile,
+)
 from .utils import load_bioprior_config
 
 __all__ = [
@@ -25,5 +32,10 @@ __all__ = [
     "GEOMETRIC_CLOSURE",
     "compute_bioprior_score",
     "propose_bioprior_segments",
+    "CertifiedFrontierPlanner",
+    "RiskCalibrator",
+    "SelectionProfile",
+    "candidates_from_rows",
+    "conformal_quantile",
     "load_bioprior_config",
 ]
