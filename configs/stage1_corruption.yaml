@@ -1,0 +1,18 @@
+budgets: [0.1, 0.2, 0.3]
+min_insert_segment_len: 1
+max_insert_segment_len: 40
+corruption_types:
+  - random_segment_insertion
+  - terminal_tail_insertion
+  - linker_like_insertion
+  - low_complexity_insertion
+  - local_duplication_insertion
+amino_acid_alphabet: ACDEFGHIKLMNPQRSTVWY
+linker_like_tokens: [G, S, P, N, Q]
+terminal_tail_bias: 0.2
+linker_like_bias: 0.25
+low_complexity_bias: 0.2
+local_duplication_bias: 0.25
+random_segment_bias: 0.1
+max_repeat_fraction: 0.6
+seed: 42

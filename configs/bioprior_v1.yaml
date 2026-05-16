@@ -1,0 +1,36 @@
+name: bioprior_v1
+description: Data-grounded BioPrior v1 segment deletion priors for protein deletion editing.
+
+terminal_lengths: [5, 10, 15, 20, 30]
+max_segment_len: 30
+min_segment_len: 3
+
+protected_feature_types:
+  - active site
+  - binding site
+  - site
+  - short sequence motif
+
+shadow_cutoff: 8.0
+contact_cutoff: 8.0
+closure_cutoff: 8.0
+low_plddt_threshold: 70
+high_plddt_threshold: 90
+low_contact_quantile: 0.3
+high_contact_quantile: 0.8
+motif_far_cutoff: 10.0
+
+hard_reject:
+  - protected_overlap
+  - disulfide_overlap
+  - metal_binding_overlap
+
+scoring_weights:
+  terminal_tail: 1.0
+  surface_flexible_loop: 1.0
+  disorder_like: 0.8
+  linker_compressibility: 0.6
+  functional_core_risk: -5.0
+  structural_core_risk: -2.0
+  motif_shadow_risk: -2.0
+  closure_bonus: 0.8

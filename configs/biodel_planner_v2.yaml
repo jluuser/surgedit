@@ -1,0 +1,39 @@
+name: biodel_planner_v2
+description: Risk-budget beam planner for BioPrior segment deletion.
+
+budgets: [0.1, 0.2, 0.3]
+
+settings:
+  safe:
+    shadow_budget_fraction: 0.0
+    closure_budget_fraction: 0.0
+    structural_budget_fraction: 0.75
+  balanced:
+    shadow_budget_fraction: 0.02
+    closure_budget_fraction: 0.10
+    structural_budget_fraction: 0.75
+  aggressive:
+    shadow_budget_fraction: 0.05
+    closure_budget_fraction: 0.25
+    structural_budget_fraction: 1.0
+
+validation_selected_operating_points:
+  "0.1": safe
+  "0.2": safe
+  "0.3": balanced
+
+beam_size: 64
+max_candidates_per_protein: 160
+allow_overshoot_fraction: 0.02
+fill_weight: 2.0
+underfill_penalty: 1.0
+overshoot_penalty: 0.2
+
+selection_protocol:
+  development_set: Core-1K dev only
+  tuning_split: BioPrior-10K validation
+  final_split: BioPrior-10K held-out test
+  notes:
+    - Do not tune operating points on test.
+    - Keep protected overlap as a hard constraint.
+    - Treat motif-shadow, closure, and structural risk as global risk budgets.

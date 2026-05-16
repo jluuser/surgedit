@@ -13,7 +13,7 @@ setup(
         "einops",
         "hydra-core",
         "omegaconf",
-        "wandb",
+        #"wandb",
         "transformers",
         "faiss-cpu",
         "pytorch-lightning",
