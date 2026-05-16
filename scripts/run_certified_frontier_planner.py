@@ -69,10 +69,18 @@ def parse_profiles(text):
             continue
         name, values = chunk.split(":", 1)
         parts = [float(item.strip()) for item in values.split(",")]
-        if len(parts) not in (3, 5):
-            raise ValueError("Profile must be name:delete_reward,risk_weight,length_penalty[,confidence_penalty,max_plan_risk]")
+        if len(parts) not in (3, 5, 8):
+            raise ValueError(
+                "Profile must be "
+                "name:delete_reward,risk_weight,length_penalty"
+                "[,confidence_penalty,max_plan_risk"
+                "[,max_shadow_rate,max_closure_rate,max_structural_risk_per_deleted]]"
+            )
         confidence_penalty = parts[3] if len(parts) >= 4 else 0.5
         max_plan_risk = parts[4] if len(parts) >= 5 else 0.35
+        max_shadow_rate = parts[5] if len(parts) >= 8 else 1.0
+        max_closure_rate = parts[6] if len(parts) >= 8 else 1.0
+        max_structural_risk = parts[7] if len(parts) >= 8 else 1.0
         profiles.append(
             SelectionProfile(
                 name=name.strip(),
@@ -81,6 +89,9 @@ def parse_profiles(text):
                 length_penalty=parts[2],
                 confidence_penalty=confidence_penalty,
                 max_plan_risk=max_plan_risk,
+                max_shadow_rate=max_shadow_rate,
+                max_closure_rate=max_closure_rate,
+                max_structural_risk_per_deleted=max_structural_risk,
             )
         )
     return profiles
@@ -179,6 +190,7 @@ def summarize(selected_rows, profiles):
         denom = float(max(1, selected_len))
         risks = [float(row.get("mean_risk_upper", 0.0) or 0.0) for row in accepted]
         confidences = [float(row.get("mean_evidence_confidence", 0.0) or 0.0) for row in accepted]
+        structural_risk_units = sum(float(row.get("structural_risk_units", 0.0) or 0.0) for row in accepted)
         out.append(
             {
                 "auto_profile": profile.name,
@@ -195,6 +207,8 @@ def summarize(selected_rows, profiles):
                 "shadow_overlap_rate": "{:.6f}".format(sum(int(row.get("shadow_overlap_residues", 0) or 0) for row in accepted) / denom),
                 "closure_unfriendly_len": sum(int(row.get("closure_unfriendly_len", 0) or 0) for row in accepted),
                 "closure_unfriendly_rate": "{:.6f}".format(sum(int(row.get("closure_unfriendly_len", 0) or 0) for row in accepted) / denom),
+                "structural_risk_units": "{:.6f}".format(structural_risk_units),
+                "structural_risk_per_deleted": "{:.6f}".format(structural_risk_units / denom),
                 "mean_risk_upper": "{:.6f}".format(sum(risks) / float(max(1, len(risks)))),
                 "mean_evidence_confidence": "{:.6f}".format(sum(confidences) / float(max(1, len(confidences)))),
             }
@@ -219,10 +233,10 @@ def write_report(path, args, calibration_rows, selected_summary, calibrator):
         handle.write("- frontier_size: {}\n".format(args.frontier_size))
         handle.write("- max_candidates: {}\n\n".format(args.max_candidates))
         handle.write("Core table:\n")
-        handle.write("profile,certified,abstained,delete_ratio,shadow_rate,closure_rate,risk_upper,confidence\n")
+        handle.write("profile,certified,abstained,delete_ratio,shadow_rate,closure_rate,structural_risk,risk_upper,confidence\n")
         for row in selected_summary:
             handle.write(
-                "{auto_profile},{certified_proteins},{abstained_proteins},{global_auto_delete_ratio},{shadow_overlap_rate},{closure_unfriendly_rate},{mean_risk_upper},{mean_evidence_confidence}\n".format(
+                "{auto_profile},{certified_proteins},{abstained_proteins},{global_auto_delete_ratio},{shadow_overlap_rate},{closure_unfriendly_rate},{structural_risk_per_deleted},{mean_risk_upper},{mean_evidence_confidence}\n".format(
                     **row
                 )
             )
@@ -338,8 +352,16 @@ def parse_args():
     parser.add_argument("--frontier_rows_per_protein", type=int, default=32)
     parser.add_argument(
         "--profiles",
-        default="conservative:0.25,3.0,0.25,0.75,0.20;default:0.55,1.5,0.10,0.50,0.35;aggressive:0.90,0.8,0.05,0.30,0.50",
-        help="Semicolon-separated name:delete_reward,risk_weight,length_penalty,confidence_penalty,max_plan_risk.",
+        default=(
+            "conservative:0.25,3.0,0.25,0.75,0.20,0.000,0.000,0.55;"
+            "default:0.55,1.5,0.10,0.50,0.35,0.010,0.000,0.60;"
+            "aggressive:0.90,0.8,0.05,0.30,0.50,0.030,0.050,0.70"
+        ),
+        help=(
+            "Semicolon-separated "
+            "name:delete_reward,risk_weight,length_penalty,confidence_penalty,"
+            "max_plan_risk,max_shadow_rate,max_closure_rate,max_structural_risk_per_deleted."
+        ),
     )
     parser.add_argument("--allow_protected_overlap", action="store_true")
     parser.add_argument("--limit_proteins", type=int, default=None)

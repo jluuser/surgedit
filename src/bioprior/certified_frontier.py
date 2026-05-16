@@ -238,6 +238,18 @@ class PlanState:
         return self.confidence_units / float(max(1, self.selected_len))
 
     @property
+    def shadow_rate(self):
+        return self.shadow_overlap / float(max(1, self.selected_len))
+
+    @property
+    def closure_rate(self):
+        return self.closure_unfriendly_len / float(max(1, self.selected_len))
+
+    @property
+    def structural_risk_per_deleted(self):
+        return self.structural_risk_units / float(max(1, self.selected_len))
+
+    @property
     def value_norm(self):
         return self.value_sum / float(max(1, self.protein_length))
 
@@ -271,6 +283,9 @@ class SelectionProfile:
     confidence_penalty: float = 0.5
     max_plan_risk: float = 0.35
     min_evidence_confidence: float = 0.0
+    max_shadow_rate: float = 1.0
+    max_closure_rate: float = 1.0
+    max_structural_risk_per_deleted: float = 1.0
 
 
 class RiskCalibrator:
@@ -342,8 +357,16 @@ class CertifiedFrontierPlanner:
 
     def _signature(self, state):
         risk_bin = int(math.floor(state.risk_upper_mean / max(self.risk_bin_width, 1e-9)))
+        structural_bin = int(math.floor(state.structural_risk_per_deleted / max(self.risk_bin_width, 1e-9)))
         length_bin = int(math.floor(state.selected_len / float(max(1, self.length_bin_size))))
-        return (length_bin, risk_bin, state.protected_overlap, state.shadow_overlap, state.closure_unfriendly_len)
+        return (
+            length_bin,
+            risk_bin,
+            structural_bin,
+            state.protected_overlap,
+            state.shadow_overlap,
+            state.closure_unfriendly_len,
+        )
 
     def _dominates(self, a, b):
         if a.protected_overlap > b.protected_overlap:
@@ -358,6 +381,8 @@ class CertifiedFrontierPlanner:
             return False
         if a.closure_unfriendly_len > b.closure_unfriendly_len:
             return False
+        if a.structural_risk_units > b.structural_risk_units:
+            return False
         return (
             a.protected_overlap < b.protected_overlap
             or a.selected_len > b.selected_len
@@ -365,6 +390,7 @@ class CertifiedFrontierPlanner:
             or a.risk_upper_units < b.risk_upper_units
             or a.shadow_overlap < b.shadow_overlap
             or a.closure_unfriendly_len < b.closure_unfriendly_len
+            or a.structural_risk_units < b.structural_risk_units
         )
 
     def _prune(self, states):
@@ -437,6 +463,9 @@ class CertifiedFrontierPlanner:
             state for state in frontier
             if state.risk_upper_mean <= profile.max_plan_risk
             and state.evidence_confidence_mean >= profile.min_evidence_confidence
+            and state.shadow_rate <= profile.max_shadow_rate
+            and state.closure_rate <= profile.max_closure_rate
+            and state.structural_risk_per_deleted <= profile.max_structural_risk_per_deleted
             and (not self.require_no_protected or state.protected_overlap == 0)
         ]
         if not feasible:
