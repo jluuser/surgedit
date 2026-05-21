@@ -1,0 +1,66 @@
+name: certified_frontier_family_planner
+description: Evidence-conditional certified Pareto-frontier planner for family-held-out BioPrior-10K.
+
+segments_csv: data/features/bioprior_10k_bioprior_segments_with_stage1_utility_certified.csv
+calibration_filter_csv: data/processed/bioprior_10k_family_splits/val.csv
+planning_filter_csv: data/processed/bioprior_10k_family_splits/test.csv
+
+calibration:
+  alpha: 0.10
+  group_key: evidence_level
+  target: risk_upper
+  observed_proxy: max(functional, motif_shadow, closure, structural, hard_reject)
+
+planner:
+  max_delete_ratio: 0.30
+  max_plan_risk: 0.35
+  frontier_size: 128
+  max_candidates: 220
+  risk_bin_width: 0.005
+  length_bin_size: 5
+  require_no_protected: true
+
+profiles:
+  conservative:
+    delete_reward: 0.25
+    risk_weight: 3.0
+    length_penalty: 0.25
+    confidence_penalty: 0.75
+    max_plan_risk: 0.20
+    max_shadow_rate: 0.000
+    max_closure_rate: 0.000
+    max_structural_risk_per_deleted: 0.55
+  default:
+    delete_reward: 0.55
+    risk_weight: 1.5
+    length_penalty: 0.10
+    confidence_penalty: 0.50
+    max_plan_risk: 0.35
+    max_shadow_rate: 0.010
+    max_closure_rate: 0.000
+    max_structural_risk_per_deleted: 0.60
+  aggressive:
+    delete_reward: 0.90
+    risk_weight: 0.8
+    length_penalty: 0.05
+    confidence_penalty: 0.30
+    max_plan_risk: 0.50
+    max_shadow_rate: 0.030
+    max_closure_rate: 0.050
+    max_structural_risk_per_deleted: 0.70
+
+outputs:
+  out_frontier_csv: results/biodel_planner/family_split/certified_frontier_test_frontier.csv
+  out_protein_selection_csv: results/biodel_planner/family_split/certified_frontier_test_protein_selection.csv
+  out_selected_segments_csv: results/biodel_planner/family_split/certified_frontier_test_selected_segments.csv
+  out_summary_csv: results/biodel_planner/family_split/certified_frontier_test_summary.csv
+  out_report: results/biodel_planner/family_split/CERTIFIED_FRONTIER_PLANNER_REPORT.md
+
+paper_framing:
+  contribution:
+    - Structured interval-deletion plans are searched as a Pareto frontier, not as one greedy plan.
+    - Risk upper bounds are calibrated on a held-out evidence regime before test-time selection.
+    - The selector may abstain when no frontier point satisfies the certified risk profile.
+  baseline_role:
+    - BioDel v2 global-risk beam search remains an engineering baseline.
+    - Certified frontier planning remains the AAAI-facing algorithmic contribution.

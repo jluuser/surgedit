@@ -80,7 +80,7 @@ def write_fasta_prefix(input_path, output_path, max_records):
     return output_path
 
 
-def baseline_specs():
+def baseline_specs(args):
     return [
         {
             "name": "nomask",
@@ -90,7 +90,7 @@ def baseline_specs():
             "name": "hardmask",
             "extra": [
                 "--motif_csv",
-                "data/processed/bioprior_10k_splits/test.csv",
+                args.split_csv,
                 "--protect_motif",
             ],
         },
@@ -98,10 +98,10 @@ def baseline_specs():
             "name": "hardmask_shadow02",
             "extra": [
                 "--motif_csv",
-                "data/processed/bioprior_10k_splits/test.csv",
+                args.split_csv,
                 "--protect_motif",
                 "--structure_priors",
-                "data/features/bioprior_10k_test_residue_biopriors.csv",
+                args.residue_priors,
                 "--protect_shadow",
                 "--shadow_penalty",
                 "0.2",
@@ -115,6 +115,8 @@ def baseline_specs():
 def main():
     parser = argparse.ArgumentParser(description="Run BioPrior-10K test SCISOR baselines.")
     parser.add_argument("--input_fasta", default="data/processed/bioprior_10k_splits/test.fasta")
+    parser.add_argument("--split_csv", default="data/processed/bioprior_10k_splits/test.csv")
+    parser.add_argument("--residue_priors", default="data/features/bioprior_10k_test_residue_biopriors.csv")
     parser.add_argument("--out_root", default="results/scisor_bioprior_10k_test")
     parser.add_argument("--budgets", default="10,20,30")
     parser.add_argument("--max_sequences", type=int, default=1000)
@@ -149,17 +151,16 @@ def main():
     device_note = "cuda_available={}".format(torch.cuda.is_available())
     print(device_note)
     if not torch.cuda.is_available():
-        print(
+        sys.stderr.write(
             "WARNING: CUDA is not available. Full 1000-protein SCISOR baselines "
-            "may be slow on CPU; consider running this script inside an srun GPU session.",
-            file=sys.stderr,
+            "may be slow on CPU; consider running this script inside an srun GPU session.\n"
         )
     child_env = subprocess_env(args)
     print("offline_hf={}".format(args.offline_hf))
     print("clear_proxy={}".format(args.clear_proxy))
 
     for budget in budgets:
-        for spec in baseline_specs():
+        for spec in baseline_specs(args):
             out_dir = os.path.join(args.out_root, "run{:02d}_{}".format(budget, spec["name"]))
             ensure_dir(out_dir)
             if output_complete(out_dir) and not args.force:

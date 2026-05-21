@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build final held-out test comparison report for BioDel-Planner."""
+"""Build final comparison report for BioDel-Planner.
+
+The script supports both the original held-out test comparison and family-held
+out split comparisons via parameters.
+"""
 
 import argparse
 import csv
@@ -181,7 +185,7 @@ def load_selected_methods(path):
     return {float(budget): item["selected_method"].replace("v2_", "") for budget, item in payload.items()}
 
 
-def summarize_selection(method, budget, proteins, selected_by_accession):
+def summarize_selection(method, budget, proteins, selected_by_accession, split_name):
     agg = Counter()
     total_selected_len = 0
     total_target_len = 0
@@ -216,7 +220,7 @@ def summarize_selection(method, budget, proteins, selected_by_accession):
         "method_label": method_label(method),
         "budget": budget,
         "budget_label": budget_label(budget),
-        "split": "test",
+        "split": split_name,
         "total_test_proteins": len(proteins),
         "analyzed_proteins": analyzed,
         "fill_ratio": total_selected_len / float(total_target_len or 1),
@@ -249,7 +253,7 @@ def detect_scisor_baselines(results_root):
     return sorted(found)
 
 
-def read_scisor_summary(path):
+def read_scisor_summary(path, split_name="test"):
     if not os.path.exists(path):
         return []
     rows = []
@@ -263,7 +267,7 @@ def read_scisor_summary(path):
                 "selected_underlying_method": "",
                 "budget": float(row["budget"]),
                 "budget_label": row.get("budget_label") or budget_label(float(row["budget"])),
-                "split": "test",
+                "split": split_name,
                 "total_test_proteins": to_int(row.get("total_test_proteins"), 0),
                 "analyzed_proteins": to_int(row.get("analyzed_proteins"), 0),
                 "fill_ratio": to_float(row.get("fill_ratio"), 0.0),
@@ -392,13 +396,13 @@ def make_plots(rows, out_dir):
     plt.close()
 
 
-def write_report(path, rows, scisor_dirs, plots_dir):
+def write_report(path, rows, scisor_summary_csv, scisor_dirs, plots_dir, split_name):
     by_budget = defaultdict(dict)
     for row in rows:
         by_budget[row["budget"]][row["method"]] = row
     with open(path, "w") as handle:
-        handle.write("# BioDel-Planner Final Test Comparison\n\n")
-        handle.write("Split: BioPrior-10K held-out test.\n\n")
+        handle.write("# BioDel-Planner Final Comparison\n\n")
+        handle.write("Split: {}.\n\n".format(split_name))
         handle.write("## Core Table\n\n")
         handle.write("| Budget | Method | Fill | Protected | Shadow rate | Closure rate | Under-80 proteins |\n")
         handle.write("|---|---|---:|---:|---:|---:|---:|\n")
@@ -428,12 +432,19 @@ def write_report(path, rows, scisor_dirs, plots_dir):
         handle.write("5. **SCISOR / hardmask / shadow penalty baseline status.**\n")
         if any(row["method"].startswith("SCISOR") for row in rows):
             handle.write("SCISOR-family baselines on the same BioPrior-10K held-out test split are included in the table and plots. They all reached fill 1.0 and validation ALL_PASS. Hardmask removes direct protected-site deletion, shadow02 strongly lowers motif-shadow deletion, but closure-unfriendly deletion remains high.\n")
+        elif os.path.exists(scisor_summary_csv):
+            handle.write(
+                "SCISOR summary file exists for this split but contains no completed baseline rows: `{}`. "
+                "Run SCISOR under a GPU allocation, summarize it, then rebuild this report.\n".format(
+                    scisor_summary_csv
+                )
+            )
         elif scisor_dirs:
             handle.write("Detected possible BioPrior-10K SCISOR directories but no summary CSV was available:\n")
             for path in scisor_dirs:
                 handle.write("- `{}`\n".format(path))
         else:
-            handle.write("No SCISOR / hardmask / shadow-penalty outputs for the BioPrior-10K held-out test split were found under `results/`.\n")
+            handle.write("No SCISOR / hardmask / shadow-penalty outputs for the selected split were found under `results/`.\n")
         handle.write("\n## Plots\n\n")
         for filename in [
             "fill_ratio_by_method_budget.png",
@@ -449,7 +460,11 @@ def write_report(path, rows, scisor_dirs, plots_dir):
 def main():
     parser = argparse.ArgumentParser(description="Build BioDel final comparison report.")
     parser.add_argument("--biodel_dir", required=True)
-    parser.add_argument("--test_csv", required=True)
+    parser.add_argument("--split_csv", required=True)
+    parser.add_argument("--split_name", default="test")
+    parser.add_argument("--segments_csv", default="data/features/bioprior_10k_bioprior_segments_with_stage1_utility.csv")
+    parser.add_argument("--selected_segments_csv", default=None)
+    parser.add_argument("--scisor_summary_csv", default="results/scisor_bioprior_10k_test/scisor_bioprior10k_test_baseline_summary.csv")
     parser.add_argument("--out_dir", required=True)
     parser.add_argument("--budgets", default="0.1,0.2,0.3")
     parser.add_argument("--max_candidates_per_protein", type=int, default=160)
@@ -463,13 +478,14 @@ def main():
 
     frontier_csv = os.path.join(args.biodel_dir, "bioprior_10k_budget_risk_frontier.csv")
     selected_json = os.path.join(args.biodel_dir, "bioprior_10k_selected_operating_points.json")
-    selected_segments_csv = os.path.join(args.biodel_dir, "bioprior_10k_test_v2_selected_segments.csv")
-    segments_csv = os.path.join("data", "features", "bioprior_10k_bioprior_segments_with_stage1_utility.csv")
-    scisor_summary_csv = os.path.join("results", "scisor_bioprior_10k_test", "scisor_bioprior10k_test_baseline_summary.csv")
+    selected_segments_csv = args.selected_segments_csv or os.path.join(
+        args.biodel_dir,
+        "bioprior_10k_test_v2_selected_segments.csv",
+    )
 
-    proteins, _ = read_test_proteins(args.test_csv)
+    proteins, _ = read_test_proteins(args.split_csv)
     budgets = parse_budgets(args.budgets)
-    segments = read_segments(segments_csv, proteins)
+    segments = read_segments(args.segments_csv, proteins)
     selected_methods = load_selected_methods(selected_json)
     v2_selected = read_v2_selected(selected_segments_csv, proteins)
 
@@ -487,24 +503,24 @@ def main():
                 )
                 for accession, seg_rows in segments.items()
             }
-            rows.append(summarize_selection(method, budget, proteins, selected_by_accession))
+            rows.append(summarize_selection(method, budget, proteins, selected_by_accession, args.split_name))
         for setting in ["safe", "balanced"]:
             selected_by_accession = {
                 accession: v2_selected.get((setting, budget, accession), [])
                 for accession in segments
             }
-            rows.append(summarize_selection("v2_{}".format(setting), budget, proteins, selected_by_accession))
+            rows.append(summarize_selection("v2_{}".format(setting), budget, proteins, selected_by_accession, args.split_name))
         selected_setting = selected_methods.get(budget)
         if selected_setting:
             selected_by_accession = {
                 accession: v2_selected.get((selected_setting, budget, accession), [])
                 for accession in segments
             }
-            selected_row = summarize_selection("validation_selected_v2", budget, proteins, selected_by_accession)
+            selected_row = summarize_selection("validation_selected_v2", budget, proteins, selected_by_accession, args.split_name)
             selected_row["selected_underlying_method"] = "v2_{}".format(selected_setting)
             selected_row["method_label"] = "BioDel v2 selected ({})".format(selected_setting)
             rows.append(selected_row)
-    rows.extend(read_scisor_summary(scisor_summary_csv))
+    rows.extend(read_scisor_summary(args.scisor_summary_csv, split_name=args.split_name))
 
     scisor_dirs = detect_scisor_baselines("results")
     table_path = os.path.join(args.out_dir, "final_test_comparison_table.csv")
@@ -513,7 +529,7 @@ def main():
     write_table(table_path, rows)
     write_by_budget(by_budget_path, rows)
     make_plots(rows, plots_dir)
-    write_report(report_path, rows, scisor_dirs, plots_dir)
+    write_report(report_path, rows, args.scisor_summary_csv, scisor_dirs, plots_dir, args.split_name)
 
     print("Read {}".format(frontier_csv))
     print("Wrote {}".format(table_path))

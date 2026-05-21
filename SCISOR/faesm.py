@@ -1,6 +1,43 @@
+import os
+
 from torch import nn
 
 from .esm import FAEsmForMaskedLM
+
+
+DEFAULT_HF_CACHE = "/public/home/zhangyangroup/chengshiz/.cache/huggingface/hub"
+
+
+def resolve_local_hf_snapshot(model_name, cache_dir=DEFAULT_HF_CACHE):
+    cache_dir = os.environ.get("BIODEL_HF_CACHE", cache_dir)
+    if os.path.isdir(model_name):
+        return model_name
+    if "/" not in model_name:
+        return model_name
+    namespace, repo = model_name.split("/", 1)
+    repo_dir = os.path.join(cache_dir, "models--{}--{}".format(namespace, repo))
+    snapshots_dir = os.path.join(repo_dir, "snapshots")
+    refs_main = os.path.join(repo_dir, "refs", "main")
+    if not os.path.isdir(snapshots_dir):
+        return model_name
+    snapshot = None
+    if os.path.exists(refs_main):
+        with open(refs_main) as handle:
+            ref = handle.read().strip()
+        candidate = os.path.join(snapshots_dir, ref)
+        if os.path.isdir(candidate):
+            snapshot = candidate
+    if snapshot is None:
+        candidates = [
+            os.path.join(snapshots_dir, name)
+            for name in os.listdir(snapshots_dir)
+            if os.path.isdir(os.path.join(snapshots_dir, name))
+        ]
+        if candidates:
+            snapshot = sorted(candidates)[-1]
+    if snapshot and os.path.exists(os.path.join(snapshot, "config.json")):
+        return snapshot
+    return model_name
 
 
 class FAESM_Base(nn.Module):
@@ -9,9 +46,11 @@ class FAESM_Base(nn.Module):
         print(f"Using FAESM model {hf_model_name}")
         conditioning_dim = kwargs.get("d_embedding", 128)
         pretrained = kwargs.get("pretrained", True)
+        model_name_or_path = resolve_local_hf_snapshot(f"facebook/{hf_model_name}")
+        print(f"Loading FAESM backbone from {model_name_or_path}")
 
         self.faesm = FAEsmForMaskedLM.from_pretrained(
-            pretrained_model_name_or_path=f"facebook/{hf_model_name}",
+            pretrained_model_name_or_path=model_name_or_path,
             use_fa=True,
             conditioning_dim=conditioning_dim,
             load_pretrained_weights=pretrained,

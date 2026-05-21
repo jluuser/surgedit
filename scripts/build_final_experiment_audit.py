@@ -65,6 +65,8 @@ def key_files():
         ("Input limitation stress", "results/biodel_planner/input_limitation_stress_report.txt", "BIODEL_INPUT_LIMITATION_STRESS_PASS"),
         ("CATH S40 benchmark report", "results/biodel_planner/CATH_DISPROT_BIODEL_BENCHMARK_REPORT.md", "CATH_DISPROT_BIODEL_BENCHMARK_REPORT_PASS"),
         ("CATH/DisProt baseline comparison", "results/biodel_planner/CATH_DISPROT_BASELINE_COMPARISON_REPORT.md", "BIODEL_CATH_DISPROT_BASELINE_COMPARISON_PASS"),
+        ("SKEMPI binder-retention proxy", "results/skempi_binder_retention/SKEMPI_BINDER_RETENTION_PROXY_REPORT.md", "SKEMPI_BINDER_RETENTION_PROXY_PASS"),
+        ("Case-study structure re-prediction prep", "results/case_studies/structure_reprediction/CASE_STUDY_STRUCTURE_REPREDICTION_REPORT.md", "CASE_STUDY_STRUCTURE_REPREDICTION_READY"),
     ]
 
 
@@ -91,6 +93,26 @@ def build_summary_rows():
             "n": "6306 single-segment deletions; 62 assays",
             "primary_result": "risk-certified BioDel Spearman 0.2481, AUROC 0.6306, AUPRC 0.6340, top10 0.9366",
             "status": "complete",
+        }
+    )
+
+    skempi_rows = read_csv("results/skempi_binder_retention/skempi_v2_binder_proxy_scored.csv")
+    skempi_metrics = read_csv("results/skempi_binder_retention/skempi_v2_binder_proxy_metrics.csv")
+    skempi_main = find_row(skempi_metrics, subset="all_scored", score_name="binder_proxy_max")
+    rows.append(
+        {
+            "experiment": "SKEMPI v2 binder proxy",
+            "dataset_role": "external binding-sensitivity proxy validation",
+            "n": "{} affinity mutations; {} complexes".format(
+                len(skempi_rows),
+                len({row.get("pdb_id", "") for row in skempi_rows if row.get("pdb_id")}),
+            ),
+            "primary_result": "binder proxy Spearman {}, AUROC {}, AUPRC {}".format(
+                skempi_main.get("spearman_log10_kd_ratio", ""),
+                skempi_main.get("auroc_damaging", ""),
+                skempi_main.get("auprc_damaging", ""),
+            ),
+            "status": "complete" if skempi_rows else "pending",
         }
     )
 
@@ -156,6 +178,16 @@ def build_summary_rows():
             "status": "complete",
         }
     )
+    case_rows = read_csv("results/case_studies/structure_reprediction/case_study_structure_reprediction_summary.csv")
+    rows.append(
+        {
+            "experiment": "Structure re-prediction case studies",
+            "dataset_role": "small qualitative structural validation prep/evaluation",
+            "n": "{} exported deletion designs".format(len(case_rows)),
+            "primary_result": "FASTA export and optional predicted-PDB metric table ready",
+            "status": "complete" if case_rows else "pending",
+        }
+    )
     return rows
 
 
@@ -195,11 +227,13 @@ def write_audit(path, summary_rows):
         handle.write("- Swiss-Prot diverse unfamiliar-protein stress test: complete.\n")
         handle.write("- CATH S40 domain-aware benchmark and baselines: complete.\n")
         handle.write("- DisProt IDR benchmark and baselines: complete.\n")
+        handle.write("- SKEMPI v2 binder-retention proxy: complete when report exists.\n")
         handle.write("- Evidence dropout, input limitation, and risk certificate experiments: complete.\n")
+        handle.write("- Case-study structure re-prediction prep: complete; GPU prediction outputs remain optional.\n")
         handle.write("\n## Remaining Work\n\n")
         handle.write("- Update the project HTML report with the final experiment table and CATH/DisProt results.\n")
         handle.write("- Consolidate method/ablation wording for Stage-1, BioPrior, risk certificate, and planner.\n")
-        handle.write("- Optional GPU-only enhancement: AF2/ESMFold re-prediction for a small number of deletion case studies.\n")
+        handle.write("- Optional GPU-only enhancement: run AF2/ESMFold/OmegaFold on exported case-study FASTA files and rerun the structure summary.\n")
         handle.write("\nBIODEL_FINAL_EXPERIMENT_AUDIT_PASS\n")
 
 

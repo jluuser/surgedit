@@ -250,10 +250,12 @@ def write_csv(path, rows):
         writer.writerows(rows)
 
 
-def write_report(path, rows):
+def write_report(path, rows, expected_count):
     ensure_parent(path)
     with open(path, "w") as handle:
         handle.write("SCISOR-family BioPrior-10K test baseline summary\n\n")
+        handle.write("expected_runs: {}\n".format(expected_count))
+        handle.write("observed_runs: {}\n\n".format(len(rows)))
         handle.write("method,budget,fill,protected,shadow_rate,closure_rate,validation\n")
         for row in rows:
             handle.write(
@@ -267,7 +269,17 @@ def write_report(path, rows):
                     row["validation_ALL_PASS"],
                 )
             )
-        all_pass = all(row["validation_ALL_PASS"] for row in rows)
+        all_pass = (
+            len(rows) == expected_count
+            and expected_count > 0
+            and all(row["validation_ALL_PASS"] for row in rows)
+        )
+        if len(rows) != expected_count:
+            handle.write(
+                "\nWARNING: observed {} SCISOR runs, expected {}.\n".format(
+                    len(rows), expected_count
+                )
+            )
         handle.write("\n{}\n".format("SCISOR_BIOPRIOR10K_BASELINES_PASS" if all_pass else "SCISOR_BIOPRIOR10K_BASELINES_WARN"))
 
 
@@ -280,12 +292,19 @@ def main():
     parser.add_argument("--out_csv", required=True)
     parser.add_argument("--out_report", required=True)
     parser.add_argument("--closure_cutoff", type=float, default=8.0)
+    parser.add_argument("--budgets", default="10,20,30")
     args = parser.parse_args()
 
     proteins = read_test_metadata(args.test_csv)
     priors = read_residue_priors(args.residue_priors)
     rows = []
-    for budget in (10, 20, 30):
+    budgets = [int(x.strip()) for x in args.budgets.split(",") if x.strip()]
+    method_specs = [
+        ("SCISOR no-mask", "nomask"),
+        ("SCISOR hardmask", "hardmask"),
+        ("SCISOR hardmask+shadow02", "hardmask_shadow02"),
+    ]
+    for budget in budgets:
         for method, suffix in [
             ("SCISOR no-mask", "nomask"),
             ("SCISOR hardmask", "hardmask"),
@@ -296,7 +315,7 @@ def main():
                 continue
             rows.append(summarize_run(run_dir, method, budget, proteins, priors, args.structure_dir, args.closure_cutoff))
     write_csv(args.out_csv, rows)
-    write_report(args.out_report, rows)
+    write_report(args.out_report, rows, expected_count=len(budgets) * len(method_specs))
     print("Wrote {}".format(args.out_csv))
     print("Wrote {}".format(args.out_report))
 

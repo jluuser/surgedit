@@ -70,6 +70,24 @@ def check_scisor_runs(root):
     return rows
 
 
+def check_scisor_runs_with_budgets(root, budgets, label_prefix):
+    rows = []
+    for budget in budgets:
+        for method in ("nomask", "hardmask", "hardmask_shadow02"):
+            run = "run{:02d}_{}".format(budget, method)
+            run_dir = os.path.join(root, run)
+            for filename in ("shrunk_sequences.fasta", "deletions.json", "validation_report.txt"):
+                path = os.path.join(run_dir, filename)
+                st = file_status(path)
+                status = "PASS" if st["ok"] else "FAIL"
+                detail = "size={}".format(st["size"])
+                if filename == "validation_report.txt":
+                    status = "PASS" if validation_pass(path) else "FAIL"
+                    detail = "ALL_PASS={}".format(validation_pass(path))
+                rows.append({"check": "{}_{}_{}".format(label_prefix, run, filename), "path": path, "status": status, "detail": detail})
+    return rows
+
+
 def check_final_metrics(table_path):
     rows = []
     if not os.path.exists(table_path):
@@ -189,10 +207,35 @@ def main():
         ("proteingym_external_validation_metrics", "results/proteingym_deletion_benchmark/proteingym_external_validation_metrics.csv"),
         ("proteingym_external_validation_report", "results/proteingym_deletion_benchmark/proteingym_external_validation_report.md"),
         ("internal_benchmark_report", "results/biodel_planner/internal_benchmark_suite_report.md"),
+        ("family_train_split", "data/processed/bioprior_10k_family_splits/train.csv"),
+        ("family_val_split", "data/processed/bioprior_10k_family_splits/val.csv"),
+        ("family_test_split", "data/processed/bioprior_10k_family_splits/test.csv"),
+        ("family_split_report", "data/processed/bioprior_10k_family_splits/split_leakage_report.txt"),
+        ("family_residue_biopriors", "data/features/bioprior_10k_family_test_residue_biopriors.csv"),
+        ("family_certified_frontier_report", "results/biodel_planner/family_split/CERTIFIED_FRONTIER_PLANNER_REPORT.md"),
+        ("family_certified_frontier_summary", "results/biodel_planner/family_split/certified_frontier_test_summary.csv"),
+        ("family_v2_summary", "results/biodel_planner/family_split/bioprior_10k_test_v2_summary.csv"),
+        ("family_auto_budget_summary", "results/biodel_planner/family_split/bioprior_10k_test_auto_budget_certified_summary.csv"),
+        ("family_budget_risk_frontier_report", "results/biodel_planner/family_split/bioprior_10k_budget_risk_frontier_report.txt"),
+        ("family_final_comparison_report", "results/biodel_planner/family_split/final_test_family_comparison/final_test_comparison_report.md"),
+        ("family_final_comparison_table", "results/biodel_planner/family_split/final_test_family_comparison/final_test_comparison_table.csv"),
+        ("family_post_selection_calibration_report", "results/biodel_planner/family_split/POST_SELECTION_CALIBRATION_RISKUPPER_PLANNERCAP_SWEEP_REPORT.md"),
+        ("family_post_selection_calibration_table", "results/biodel_planner/family_split/post_selection_calibration_riskupper_plannercap_sweep.csv"),
+        ("proteingym_bootstrap_report", "results/proteingym_v13_indel/PROTEINGYM_V13_BOOTSTRAP_SCORE_COMPARISON_REPORT.md"),
+        ("proteingym_bootstrap_table", "results/proteingym_v13_indel/proteingym_v13_bootstrap_score_comparison.csv"),
+        ("skempi_binder_proxy_report", "results/skempi_binder_retention/SKEMPI_BINDER_RETENTION_PROXY_REPORT.md"),
+        ("skempi_binder_proxy_scored", "results/skempi_binder_retention/skempi_v2_binder_proxy_scored.csv"),
+        ("skempi_binder_proxy_metrics", "results/skempi_binder_retention/skempi_v2_binder_proxy_metrics.csv"),
+        ("case_study_reprediction_report", "results/case_studies/structure_reprediction/CASE_STUDY_STRUCTURE_REPREDICTION_REPORT.md"),
+        ("case_study_reprediction_summary", "results/case_studies/structure_reprediction/case_study_structure_reprediction_summary.csv"),
+        ("aaai_benchmark_suite_report", "results/biodel_planner/AAAI_BENCHMARK_SUITE_REPORT.md"),
+        ("aaai_benchmark_suite_status", "results/biodel_planner/aaai_benchmark_suite_status.csv"),
     ]
     rows = check_files(required_files)
     rows.extend(check_scisor_runs("results/scisor_bioprior_10k_test"))
+    rows.extend(check_scisor_runs_with_budgets("results/scisor_bioprior_10k_family_test", (10, 20, 30), "family_scisor"))
     rows.extend(check_final_metrics("results/biodel_planner/final_test_comparison/final_test_comparison_table.csv"))
+    rows.extend(check_final_metrics("results/biodel_planner/family_split/final_test_family_comparison/final_test_comparison_table.csv"))
 
     token_checks = [
         ("split_leakage_pass", "data/processed/bioprior_10k_splits/split_leakage_report.txt", "BIOPRIOR_SPLIT_LEAKAGE_PASS"),
@@ -206,6 +249,17 @@ def main():
         ("proteingym_stage1_scoring_pass", "results/proteingym_deletion_benchmark/proteingym_single_segment_deletions_stage1_scored_summary.txt", "PROTEINGYM_STAGE1_SCORING_PASS"),
         ("proteingym_external_validation_pass", "results/proteingym_deletion_benchmark/proteingym_external_validation_report.md", "PROTEINGYM_EXTERNAL_VALIDATION_PASS"),
         ("internal_benchmark_pass", "results/biodel_planner/internal_benchmark_suite_report.md", "BIODEL_INTERNAL_BENCHMARK_PASS"),
+        ("family_split_leakage_pass", "data/processed/bioprior_10k_family_splits/split_leakage_report.txt", "BIOPRIOR_FAMILY_SPLIT_LEAKAGE_PASS"),
+        ("family_certified_frontier_pass", "results/biodel_planner/family_split/CERTIFIED_FRONTIER_PLANNER_REPORT.md", "BIODEL_CERTIFIED_FRONTIER_PLANNER_PASS"),
+        ("family_v2_pass", "results/biodel_planner/family_split/bioprior_10k_test_v2_report.txt", "BIODEL_PLANNER_V2_PASS"),
+        ("family_auto_budget_pass", "results/biodel_planner/family_split/bioprior_10k_test_auto_budget_certified_report.txt", "BIODEL_AUTO_BUDGET_PLANNER_PASS"),
+        ("family_budget_risk_frontier_pass", "results/biodel_planner/family_split/bioprior_10k_budget_risk_frontier_report.txt", "BIODEL_BUDGET_RISK_FRONTIER_PASS"),
+        ("family_final_comparison_pass", "results/biodel_planner/family_split/final_test_family_comparison/final_test_comparison_report.md", "BIODEL_FINAL_COMPARISON_PASS"),
+        ("family_post_selection_calibration_pass", "results/biodel_planner/family_split/POST_SELECTION_CALIBRATION_RISKUPPER_PLANNERCAP_SWEEP_REPORT.md", "BIODEL_POST_SELECTION_CALIBRATION_PASS"),
+        ("proteingym_bootstrap_pass", "results/proteingym_v13_indel/PROTEINGYM_V13_BOOTSTRAP_SCORE_COMPARISON_REPORT.md", "PROTEINGYM_V13_BOOTSTRAP_SCORE_COMPARISON_PASS"),
+        ("skempi_binder_proxy_pass", "results/skempi_binder_retention/SKEMPI_BINDER_RETENTION_PROXY_REPORT.md", "SKEMPI_BINDER_RETENTION_PROXY_PASS"),
+        ("case_study_reprediction_ready", "results/case_studies/structure_reprediction/CASE_STUDY_STRUCTURE_REPREDICTION_REPORT.md", "CASE_STUDY_STRUCTURE_REPREDICTION_READY"),
+        ("aaai_benchmark_suite_pass", "results/biodel_planner/AAAI_BENCHMARK_SUITE_REPORT.md", "BIODEL_AAAI_BENCHMARK_SUITE_REPORT_PASS"),
     ]
     for check, path, token in token_checks:
         rows.append({"check": check, "path": path, "status": "PASS" if contains(path, token) else "FAIL", "detail": "token={}".format(token)})
@@ -223,6 +277,15 @@ def main():
         "proteingym_deletion_rows": csv_rows("results/proteingym_deletion_benchmark/proteingym_single_segment_deletions.csv"),
         "proteingym_metric_rows": csv_rows("results/proteingym_deletion_benchmark/proteingym_external_validation_metrics.csv"),
         "internal_benchmark_report": "results/biodel_planner/internal_benchmark_suite_report.md",
+        "family_train_rows": csv_rows("data/processed/bioprior_10k_family_splits/train.csv"),
+        "family_val_rows": csv_rows("data/processed/bioprior_10k_family_splits/val.csv"),
+        "family_test_rows": csv_rows("data/processed/bioprior_10k_family_splits/test.csv"),
+        "family_final_comparison_rows": csv_rows("results/biodel_planner/family_split/final_test_family_comparison/final_test_comparison_table.csv"),
+        "family_post_selection_rows": csv_rows("results/biodel_planner/family_split/post_selection_calibration_riskupper_plannercap_sweep.csv"),
+        "proteingym_bootstrap_rows": csv_rows("results/proteingym_v13_indel/proteingym_v13_bootstrap_score_comparison.csv"),
+        "skempi_binder_proxy_rows": csv_rows("results/skempi_binder_retention/skempi_v2_binder_proxy_scored.csv"),
+        "case_study_reprediction_rows": csv_rows("results/case_studies/structure_reprediction/case_study_structure_reprediction_summary.csv"),
+        "aaai_benchmark_suite_rows": csv_rows("results/biodel_planner/aaai_benchmark_suite_status.csv"),
     }
     write_csv(args.out_csv, rows)
     write_report(args.out_report, rows, summary)

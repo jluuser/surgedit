@@ -114,6 +114,8 @@ def score_columns(fields):
         ("full_biodel_score", "full_biodel_score"),
         ("risk_upper_only", "risk_upper_favorable_score"),
         ("risk_certified_biodel_score", "risk_certified_biodel_score"),
+        ("compatibility_model_score", "compatibility_score"),
+        ("compatibility_model_biodel_score", "compatibility_biodel_score"),
     ]
     cols = [(name, col) for name, col in fixed if col in fields]
     for field in fields:
@@ -161,6 +163,8 @@ def evaluate_per_assay(rows, fields):
         ("full_biodel_score", "full_biodel_score"),
         ("risk_upper_only", "risk_upper_favorable_score"),
         ("risk_certified_biodel_score", "risk_certified_biodel_score"),
+        ("compatibility_model_score", "compatibility_score"),
+        ("compatibility_model_biodel_score", "compatibility_biodel_score"),
     ]
     selected.extend((name, col) for name, col in score_columns(fields) if name.startswith("proteingym_zero_shot:"))
     for assay, group in grouped.items():

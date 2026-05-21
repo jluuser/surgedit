@@ -1,0 +1,52 @@
+name: bioprior_10k_family_heldout
+description: Cluster-held-out BioPrior-10K split and family-level held-out comparison manifest.
+
+data:
+  core_csv: data/processed/swissprot_motif_bioprior_10k.csv
+  split_dir: data/processed/bioprior_10k_family_splits
+  train_csv: data/processed/bioprior_10k_family_splits/train.csv
+  val_csv: data/processed/bioprior_10k_family_splits/val.csv
+  test_csv: data/processed/bioprior_10k_family_splits/test.csv
+  test_fasta: data/processed/bioprior_10k_family_splits/test.fasta
+  split_report: data/processed/bioprior_10k_family_splits/split_leakage_report.txt
+
+structures:
+  structure_dir: data/structures/afdb_bioprior_10k
+  mapping_csv: data/structures/afdb_bioprior_10k_mapping.csv
+  summary_txt: data/structures/afdb_bioprior_10k_summary.txt
+
+features:
+  residue_biopriors: data/features/bioprior_10k_residue_biopriors.csv
+  residue_biopriors_summary: data/features/bioprior_10k_residue_biopriors_summary.txt
+  test_residue_biopriors: data/features/bioprior_10k_family_test_residue_biopriors.csv
+  segments: data/features/bioprior_10k_bioprior_segments.csv
+  segments_summary: data/features/bioprior_10k_bioprior_segments_summary.txt
+  segments_with_stage1_utility: data/features/bioprior_10k_bioprior_segments_with_stage1_utility.csv
+  stage1_utility_summary: data/features/bioprior_10k_bioprior_segments_with_stage1_utility_summary.txt
+
+stage1:
+  checkpoint: checkpoints/stage1_deletion_prior_100k/best_model.pt
+  test_metrics: results/stage1_deletion_prior_100k/test_metrics.json
+
+planner:
+  certified_frontier:
+    val_summary: results/biodel_planner/family_split/certified_frontier_val_summary.csv
+    test_summary: results/biodel_planner/family_split/certified_frontier_test_summary.csv
+    report: results/biodel_planner/family_split/CERTIFIED_FRONTIER_PLANNER_REPORT.md
+  v2:
+    val_summary: results/biodel_planner/family_split/bioprior_10k_val_v2_summary.csv
+    test_summary: results/biodel_planner/family_split/bioprior_10k_test_v2_summary.csv
+    selected_operating_points: results/biodel_planner/family_split/bioprior_10k_selected_operating_points.json
+    budget_risk_frontier: results/biodel_planner/family_split/bioprior_10k_budget_risk_frontier.csv
+    budget_risk_report: results/biodel_planner/family_split/bioprior_10k_budget_risk_frontier_report.txt
+
+scisor_baselines:
+  root: results/scisor_bioprior_10k_family_test
+  summary_csv: results/scisor_bioprior_10k_family_test/scisor_bioprior10k_family_test_baseline_summary.csv
+  summary_txt: results/scisor_bioprior_10k_family_test/scisor_bioprior10k_family_test_baseline_summary.txt
+  methods: [nomask, hardmask, hardmask_shadow02]
+  budgets: [10, 20, 30]
+
+notes:
+  split_protocol: CD-HIT family-held-out split with intact clusters across train/val/test.
+  primary_goal: Evaluate whether certified frontier planning remains stable under family-level holdout.

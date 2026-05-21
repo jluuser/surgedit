@@ -154,6 +154,9 @@ class SegmentCandidate:
 
     @property
     def value_sum(self):
+        learned = _as_float(self.row.get("compatibility_score"), None)
+        if learned is not None:
+            return self.length * (self.utility + 0.20 * self.bioprior + learned)
         return self.length * (self.utility + 0.20 * self.bioprior)
 
     @property
